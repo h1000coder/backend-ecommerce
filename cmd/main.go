@@ -10,6 +10,7 @@ import (
 	"soulstreet/internal/handler"
 	"soulstreet/internal/repository"
 	"soulstreet/internal/service"
+	"github.com/joho/godotenv"
 )
 
 
@@ -20,6 +21,14 @@ func init() {
 			log.Fatalf("Error creating uploads directory: %v", err)
 		}
 	}
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Failed to load dotenv")
+	}
+	if os.Getenv("MP_TOKEN") == "" {
+		log.Fatal("MP_TOKEN IS EMPTY")
+	}
+	
 }
 
 func main() {
@@ -52,7 +61,8 @@ func main() {
 	mux.HandleFunc("GET /product/name", handlerProduct.GetProductByName)
 
 	// Endpoints pagamento
-	mux.HandleFunc("POST /webhook", handlerPayment.CreatePayment)
+	mux.HandleFunc("POST /checkout", handlerPayment.CreatePayment)
+	mux.HandleFunc("POST /webhook", handlerPayment.WebHookPayment)
 
 	
 	fmt.Println("Servidor rodando http://localhost:8080")

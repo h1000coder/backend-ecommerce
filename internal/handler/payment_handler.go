@@ -1,11 +1,13 @@
 package handler
 
 import (
-	"fmt"
+	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
+	"soulstreet/internal/model"
 	"soulstreet/internal/service"
-	"soulstreet/pkg/json"
+	sendjson "soulstreet/pkg/json"
 )
 
 type PaymentHandler struct {
@@ -19,11 +21,48 @@ func NewPaymentHandler(paymentService service.PaymentService) *PaymentHandler {
 }
 
 func (h *PaymentHandler) CreatePayment(w http.ResponseWriter, r *http.Request) {
-	requestBody, err := io.ReadAll(r.Body)
+	var paymentData model.Payment
+
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
+		sendjson.SendJsonError(w, http.StatusBadRequest, errors.New("Error to read req body"))
 		return
 	}
-	fmt.Println(string(requestBody))
-	json.SendJson(w, http.StatusOK, "Payment created successfully")
+
+	err = json.Unmarshal(body, &paymentData)
+	if err != nil {
+		sendjson.SendJsonError(w, http.StatusBadRequest, errors.New("Invalid JSON"))
+		return
+	}
+
+	paymentUrl, err := h.paymentService.CreatePayment(paymentData)
+	if err != nil {
+		sendjson.SendJsonError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	sendjson.SendJson(w, http.StatusCreated, paymentUrl)
+
+}
+
+func (h *PaymentHandler) WebHookPayment(w http.ResponseWriter, r *http.Request) {
+	var webhookData model.WebHookData
+
+	jsonBody, err := io.ReadAll(r.Body)
+	if err != nil {
+		sendjson.SendJsonError(w, http.StatusUnprocessableEntity, errors.New("Não foi possivel ler o corpo da requisição"))
+		return
+	}
+
+	err = json.Unmarshal(jsonBody, &webhookData)
+	if err != nil {
+		sendjson.SendJsonError(w, http.StatusBadRequest, errors.New("Json invalido"))
+		return
+	}
+
+	if webhookData.Action == "payment.updated" {
+		service.GetStatus(webhookData.Data.ID)
+	} else {
+		return
+	}
 }
